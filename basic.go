@@ -35,6 +35,7 @@ func variableShorter() {
 }
 
 func consts() {
+	// const可以作为各种数据类型使用
 	const (
 		ss = "def"
 		a  = 3
@@ -45,6 +46,27 @@ func consts() {
 	fmt.Println(ss, c)
 }
 
+func enums() {
+	// 枚举
+	const (
+		golang = iota
+		python
+		java
+		javascript
+	)
+	fmt.Println(golang, python, java, javascript)
+
+	const (
+		b = 1 << (10 * iota)
+		kb
+		mb
+		gb
+		tb
+		pb
+	)
+	fmt.Println(b, kb, mb, gb, tb, pb)
+}
+
 func main() {
 	fmt.Println("hello world!")
 	variableZeroVaule()
@@ -52,4 +74,7 @@ func main() {
 	variableTypeDeduction()
 	variableShorter()
 	fmt.Println(aa, bb, cc)
+
+	consts()
+	enums()
 }

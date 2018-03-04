@@ -6,6 +6,7 @@ import (
 )
 
 func main() {
+
 	const filename = "abc.txt"
 	contents, err := ioutil.ReadFile(filename)
 	if err != nil {

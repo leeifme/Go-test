@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 func main() {
 
@@ -16,7 +19,8 @@ func main() {
 	for _, v := range arr1 {
 		fmt.Println(v)
 	}
-
+	a := ""
+	b, _ := strconv.Atoi(a)
 	maxi := -1
 	maxv := -1
 	for i, v := range arr3 {
@@ -25,5 +29,6 @@ func main() {
 		}
 	}
 	fmt.Println(maxi, maxv)
+	fmt.Println(b)
 
 }

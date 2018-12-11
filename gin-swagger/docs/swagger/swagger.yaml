@@ -1,0 +1,91 @@
+definitions:
+  main.MessageInfo:
+    properties:
+      messge:
+        type: string
+    type: object
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: get api param
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Example API
+  version: "1.0"
+paths:
+  /hello/{name}:
+    get:
+      consumes:
+      - application/json
+      description: get api hello
+      parameters:
+      - description: name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MessageInfo'
+            type: object
+      security:
+      - Beraer: []
+      summary: Hello
+      tags:
+      - Hello
+  /param:
+    get:
+      consumes:
+      - application/json
+      description: get api param
+      parameters:
+      - description: name
+        in: query
+        name: name
+        required: true
+        type: string
+      - description: name
+        in: query
+        name: age
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MessageInfo'
+            type: object
+      security:
+      - Beraer: []
+      summary: Param
+      tags:
+      - Param
+  /ping:
+    get:
+      consumes:
+      - application/json
+      description: get api ping
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MessageInfo'
+            type: object
+      security:
+      - Beraer: []
+      summary: Ping
+      tags:
+      - Ping
+swagger: "2.0"

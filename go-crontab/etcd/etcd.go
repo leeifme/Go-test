@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 )
 
 func main() {
@@ -30,13 +31,20 @@ func main() {
 	kv := clientv3.NewKV(client)
 	// 新建一个租约
 	lease := clientv3.NewLease(client)
+	// 新建一个watcher
+	watcher := clientv3.NewWatcher(client)
 
-	// op etcd
+	// etcd 常规操作
 	// putResp(kv)
 	// getResp(kv)
 	// getFixResp(kv)
 	// deleteResp(kv)
-	leaseResp(kv, lease)
+
+	// 租约，定时续约
+	// leaseResp(kv, lease)
+
+	// 服务注册，服务发现，watch监听
+	watcherResp(kv, lease, watcher)
 }
 
 func putResp(kv clientv3.KV) {
@@ -146,4 +154,51 @@ func leaseResp(kv clientv3.KV, lease clientv3.Lease) {
 		time.Sleep(2 * time.Second)
 	}
 
+}
+
+func watcherResp(kv clientv3.KV, lease clientv3.Lease, watcher clientv3.Watcher) {
+	var (
+		getResp   *clientv3.GetResponse
+		err       error
+		watchResp clientv3.WatchResponse
+	)
+	//模拟etcd中的kv的变化
+	go func() {
+		for {
+			kv.Put(context.TODO(), "/corn/watch/", "test", clientv3.WithPrevKV())
+			kv.Delete(context.TODO(), "/corn/watch/", clientv3.WithPrevKV())
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	// 先 get 到当前值，后续监听
+	if getResp, err = kv.Get(context.TODO(), "/corn/watch/", clientv3.WithPrevKV()); err != nil {
+		fmt.Println(err)
+		return
+	} else {
+		fmt.Println("获取到当前值：", string(getResp.Kvs[0].Value))
+	}
+	watcherStartReversion := getResp.Header.Revision + 1
+
+	//启动监听
+	fmt.Println("从该版本向后监听: ", watcherStartReversion)
+
+	ctx, cancelFunc := context.WithCancel(context.TODO())
+	time.AfterFunc(15*time.Second, func() {
+		cancelFunc()
+	})
+
+	// 开始监听
+	watchRespChan := watcher.Watch(ctx, "/corn/watch/", clientv3.WithRev(watcherStartReversion))
+	//处理kv变化事件
+	for watchResp = range watchRespChan {
+		for _, event := range watchResp.Events {
+			switch event.Type {
+			case mvccpb.PUT:
+				fmt.Println("修改为:", string(event.Kv.Value), "Revision:", event.Kv.CreateRevision, event.Kv.ModRevision)
+			case mvccpb.DELETE:
+				fmt.Println("删除了:", "Revision:", event.Kv.ModRevision)
+			}
+		}
+	}
 }

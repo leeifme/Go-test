@@ -28,11 +28,11 @@ func main() {
 
 	// fmt.Println("连接成功")
 	//用于etcd的键值对
-	kv := clientv3.NewKV(client)
-	// 新建一个租约
-	lease := clientv3.NewLease(client)
-	// 新建一个watcher
-	watcher := clientv3.NewWatcher(client)
+	// kv := clientv3.NewKV(client)
+	// // 新建一个租约
+	// lease := clientv3.NewLease(client)
+	// // 新建一个watcher
+	// watcher := clientv3.NewWatcher(client)
 
 	// etcd 常规操作
 	// putResp(kv)
@@ -44,7 +44,10 @@ func main() {
 	// leaseResp(kv, lease)
 
 	// 服务注册，服务发现，watch监听
-	watcherResp(kv, lease, watcher)
+	// watcherResp(kv, lease, watcher)
+
+	//etcd 事务处理，任务抢占
+	txnResp(client)
 }
 
 func putResp(kv clientv3.KV) {
@@ -201,4 +204,90 @@ func watcherResp(kv clientv3.KV, lease clientv3.Lease, watcher clientv3.Watcher)
 			}
 		}
 	}
+}
+
+func txnResp(client *clientv3.Client) {
+	var (
+		kv    clientv3.KV
+		lease clientv3.Lease
+		txn   clientv3.Txn
+
+		// ctx context.Context
+
+		leaseGrantResp     *clientv3.LeaseGrantResponse
+		leaseKeepAliveResp <-chan *clientv3.LeaseKeepAliveResponse
+		keepResp           *clientv3.LeaseKeepAliveResponse
+		txnResp            *clientv3.TxnResponse
+		err                error
+	)
+
+	kv = clientv3.NewKV(client)
+
+	//1, 上锁 (创建租约，自动续租，拿着租约去抢占一个 key)
+	lease = clientv3.NewLease(client)
+
+	// 准备一个用于取消自动续租的 context
+	ctx, cancelFunc := context.WithCancel(context.TODO())
+
+	// 申请 1 个 5 秒的租约
+	if leaseGrantResp, err = lease.Grant(ctx, 5); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// 拿到租约 ID
+	leaseID := leaseGrantResp.ID
+
+	//5 秒后会取消租约  续租
+	if leaseKeepAliveResp, err = lease.KeepAlive(context.TODO(), leaseID); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// 处理续约应答的协程
+	go func() {
+		for {
+			select {
+			case keepResp = <-leaseKeepAliveResp:
+				if keepResp == nil {
+					fmt.Println("租约已经失效")
+					goto END
+				} else {
+					fmt.Println(time.Now().Format("2006-01-02 15:04:05"), " 收到自动续租应答:", keepResp.ID)
+				}
+			}
+		}
+	END:
+	}()
+
+	// 创建事务
+	txn = kv.Txn(context.TODO())
+
+	// 定义事务
+	//if 不存在 key, then 设置它， else 抢锁失败
+	txn.If(clientv3.Compare(clientv3.CreateRevision("/corn/job/test"), "=", 0)).
+		Then(clientv3.OpPut("/corn/job/test", "test", clientv3.WithLease(leaseID))).
+		Else(clientv3.OpGet("/corn/job/test", clientv3.WithPrevKV()))
+
+	// 提交事务
+	if txnResp, err = txn.Commit(); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// 判断是否抢到了锁
+	if !txnResp.Succeeded {
+		fmt.Println(" 锁被占用:", string(txnResp.Responses[0].GetResponseRange().Kvs[0].Value))
+		return
+	}
+
+	//2, 处理业务
+	fmt.Println(" 处理任务 ")
+	time.Sleep(50 * time.Second)
+
+	//3, 释放锁（取消自动续租，释放租约
+	//defer 会把租约释放掉，关联的 KV 就被删除了
+	// 确保函数退出后，自动续租会停止
+	defer cancelFunc()
+	defer lease.Revoke(context.TODO(), leaseID)
 }

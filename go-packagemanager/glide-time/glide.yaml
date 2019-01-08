@@ -1,0 +1,5 @@
+package: leeif.me/manager-go/glide-time
+import:
+- package: github.com/beego/mux
+- package: go.uber.org/zap
+  version: ^1.9.0

@@ -1,0 +1,3 @@
+package: leeif.me/manager-go
+import:
+- package: github.com/dustin/go-humanize
